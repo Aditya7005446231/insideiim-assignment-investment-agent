@@ -2,13 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
+import 'dotenv/config';
 import { listRuns, saveRun, getRun, generateId } from './lib/db.js';
 import { runResearchAgent } from './lib/agent/index.js';
 import { agentEvents } from './lib/agent/events.js';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -102,7 +99,7 @@ app.get('/api/research/:id/stream', (req, res) => {
   const listener = (data) => {
     try {
       res.write(`event: ${data.event}\ndata: ${JSON.stringify(data.payload)}\n\n`);
-      
+
       // Close stream if completed or failed
       if (
         data.event === 'result' ||
