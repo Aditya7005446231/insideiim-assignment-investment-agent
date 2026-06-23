@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
-import { 
-  Search, 
-  TrendingUp, 
-  History, 
-  ArrowRight, 
-  CheckCircle, 
-  XCircle, 
-  Loader2, 
-  Sparkles, 
-  FileText, 
-  ShieldAlert 
+import {
+  Search,
+  TrendingUp,
+  History,
+  ArrowRight,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  Sparkles,
+  FileText,
+  ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -85,7 +85,7 @@ export default function Dashboard({ onNavigate }) {
           </div>
           <div>
             <span className="font-bold text-lg tracking-wide bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">
-              PROMPT_TOOL
+              AI Powered
             </span>
             <span className="text-[10px] block font-mono text-indigo-400 tracking-widest mt-[-2px] uppercase">
               Investment Agent
@@ -102,7 +102,7 @@ export default function Dashboard({ onNavigate }) {
 
       {/* Main Grid */}
       <main className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8 my-auto z-10 py-12">
-        
+
         {/* Left Side: Search & Initiate Form */}
         <div className="lg:col-span-7 flex flex-col justify-center">
           <motion.div
@@ -117,7 +117,7 @@ export default function Dashboard({ onNavigate }) {
               </span>
             </h1>
             <p className="text-slate-400 mt-4 max-w-lg leading-relaxed text-sm md:text-base">
-              Harness multi-agent graph workflows using <strong className="text-slate-300">LangGraph.js</strong>. 
+              Harness multi-agent graph workflows using <strong className="text-slate-300">LangGraph.js</strong>.
               Our agent searches market reports, calculates financial ratios, and builds a comprehensive SWOT analysis to deliver an actionable Investment thesis.
             </p>
           </motion.div>
@@ -155,28 +155,26 @@ export default function Dashboard({ onNavigate }) {
                   <button
                     type="button"
                     onClick={() => setDepth('quick')}
-                    className={`py-2 text-xs font-medium rounded-lg transition-all cursor-pointer ${
-                      depth === 'quick'
-                        ? 'bg-indigo-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
+                    className={`py-2 text-xs font-medium rounded-lg transition-all cursor-pointer ${depth === 'quick'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                      }`}
                   >
                     Quick Analysis
                   </button>
                   <button
                     type="button"
                     onClick={() => setDepth('deep')}
-                    className={`py-2 text-xs font-medium rounded-lg transition-all cursor-pointer ${
-                      depth === 'deep'
-                        ? 'bg-indigo-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
+                    className={`py-2 text-xs font-medium rounded-lg transition-all cursor-pointer ${depth === 'deep'
+                      ? 'bg-indigo-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                      }`}
                   >
                     Deep Research
                   </button>
                 </div>
                 <p className="text-[10px] text-slate-500 mt-1.5 px-1 font-mono">
-                  {depth === 'quick' 
+                  {depth === 'quick'
                     ? '• Rapid search, evaluates key ratios & returns direct metrics (15-20s)'
                     : '• Multi-source retrieval, processes secondary sources & details risks (45-60s)'}
                 </p>
