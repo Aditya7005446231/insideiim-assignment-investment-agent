@@ -1,0 +1,106 @@
+========================================================================
+            AI INVESTMENT RESEARCH AGENT - ASSIGNMENT DETAILS
+========================================================================
+
+This document contains all the necessary text and answers requested for your take-home assignment submission. You can copy and paste the sections below directly into your Google Form.
+
+========================================================================
+1. OVERVIEW — WHAT IT DOES
+========================================================================
+The AI Investment Research Agent is an institutional-grade, automated researcher and analyst designed to evaluate target companies. It takes a user-supplied company name (e.g., "Nike" or "Apple") and depth option, performs autonomous multi-source data scraping and search operations, standardizes core financial valuation metrics, generates a detailed SWOT matrix, and outputs an actionable "INVEST" or "PASS" verdict accompanied by a confidence percentage gauge and structured thesis report.
+
+To prevent quota blockages during evaluation, the application includes a "Simulation Mode" fallback. If no active third-party API keys are set in the environment, it uses mock execution flows that replicate latency, SSE events, and timeline indicators so that the full client dashboard can be analyzed immediately.
+
+========================================================================
+2. HOW TO RUN IT — SETUP AND RUN STEPS (KEYS & ENV NEEDED)
+========================================================================
+Ensure you have Node.js (v18+) installed on your machine.
+
+--- ENVIRONMENT CONFIGURATION ---
+Create a `.env` file in the root directory:
+```env
+PORT=3000
+
+# Optional: Add keys for live internet research and LLM generation
+SERPER_API_KEY=your_serper_search_api_key
+OPENROUTER_API_KEY=your_openrouter_api_key
+# OR standard OpenAI key:
+OPENAI_API_KEY=your_openai_api_key
+```
+*Note: If no API keys are provided in .env, the app runs in simulated demonstration mode.*
+
+--- SETUP COMMANDS ---
+1. Install dependencies for the root backend and frontend folders:
+   ```bash
+   npm run install-all
+   ```
+2. Build the compiled static frontend files:
+   ```bash
+   npm run build-frontend
+   ```
+3. Boot the backend server:
+   ```bash
+   npm start
+   ```
+4. Access the application in your browser:
+   **http://localhost:3000**
+
+========================================================================
+3. HOW IT WORKS — APPROACH AND ARCHITECTURE
+========================================================================
+The workflow is engineered around a stateful multi-agent architecture orchestrated by LangGraph.js. The orchestration is defined as a directed workflow graph:
+
+* STATE: Defined in `lib/agent/state.js` using `AgentStateAnnotation`. It acts as the shared graph memory, storing the target company, raw research documents (appended via a reducer), extracted ratios, final decision, and timeline logs.
+* NODES (lib/agent/graph.js):
+  1. Researcher Node (researcherNode): Queries the Serper search API for stock performance, news, and valuations. Falls back to LLM historical query generation if the key is missing.
+  2. Financial Analyst Node (analystNode): Formulates a structured extraction prompt instructing the LLM to return a validated JSON payload containing key financial metrics (P/E ratio, Market Cap, YoY Revenue Growth, Profit Margin, Debt-to-Equity) and an analytical summary paragraph.
+  3. Critic Node (criticNode): Acts as a conservative investment officer. Evaluates the parsed metrics, writes a SWOT analysis, sets a confidence score, and makes the final decision.
+* WORKFLOW TRANSITIONS: wired sequentially as:
+  START ➔ Researcher Node ➔ Financial Analyst Node ➔ Critic Node ➔ END
+* REAL-TIME STREAMING: Express uses Server-Sent Events (SSE) to push status updates from the running graph down to the client. The frontend dashboard connects using a browser EventSource, updating timeline highlight states, streaming terminal output, and rendering radial SVG gauges in real time.
+
+========================================================================
+4. KEY DECISIONS & TRADE-OFFS
+========================================================================
+* Vite React over Next.js: Decoupled Vite frontend + Express backend simplifies Server-Sent Events (SSE) connections compared to Next.js streaming actions, making real-time console rendering robust.
+* Raw JSON Schema Prompting: Instead of pulling in heavy schema validation packages, we used tailored system prompt formatting instructions and automated regex cleans to strip markdown code fences from the LLM outputs before parsing.
+* Serper Search Integration: Serper was chosen for its raw speed and reliability in extracting clean web page snippets.
+* Simulation Fallback Mode: Implemented to protect API credit limits and bypass network failure blocks, ensuring the frontend visual ledger animations and final result layouts remain fully interactive.
+
+========================================================================
+5. EXAMPLE RUNS — OUTPUTS OF RUNS
+========================================================================
+Here is a sample execution run generated by the agent:
+
+--- TARGET RUN: NIKE ---
+* Target Company: Nike
+* Verdict: INVEST
+* Confidence: 85%
+* Extracted Metrics:
+  - Market Cap: $260 Billion
+  - P/E Ratio: 27.8
+  - YoY Revenue Growth: 9.2%
+  - Profit Margin: 9.0%
+  - Debt/Equity Ratio: 1.0
+* Summary Thesis: Nike demonstrates robust financial performance with consistent revenue and profit growth. Brand strength and market position justify its premium valuation. Opportunities in direct-to-consumer digital channels and product innovation segment offset competitive and discretionary spending threats.
+* SWOT Matrix:
+  - Strengths: High brand equity, consistent YoY revenue/profit growth, robust free cash flow ($5.8B).
+  - Weaknesses: Premium P/E ratio limits multiple expansion if expectations are missed.
+  - Opportunities: Emerging markets growth, DTC digital expansion.
+  - Threats: Direct competition from Adidas/Puma, global discretionary inflation pressures.
+
+========================================================================
+6. WHAT YOU WOULD IMPROVE WITH MORE TIME
+========================================================================
+1. Branching & Parallel Execution: Fetch sector metrics and target metrics in parallel using LangGraph branching features to evaluate the company relative to its peers.
+2. Direct Database Integrations: Integrate financial chart tools (like TradingView/D3) on the frontend connected to live stock APIs (like Yahoo Finance).
+3. Export PDF Reports: Generate printable PDF investment sheets detailing the agent's thesis and SWOT matrices.
+
+========================================================================
+7. BONUS POINTS: LLM CHAT PAIR PROGRAMMING LOGS
+========================================================================
+This project was built in continuous collaboration with an AI pair programmer. The full chronological history of our chat logs, plans, and build transcriptions has been parsed and exported to:
+* File Path: `InsideIIM Assignment/AI_AGENT_CHAT_LOGS.md`
+
+Please find this file included in the ZIP archive to review our planning processes and developer-AI synergy.
+========================================================================
