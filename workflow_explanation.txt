@@ -1,0 +1,141 @@
+========================================================================
+             AI INVESTMENT AGENT - LANGGRAPH WORKFLOW EXPLANATION
+========================================================================
+
+This document provides a detailed breakdown of how LangGraph is utilized in this project to orchestrate the AI Investment Research Agent.
+
+------------------------------------------------------------------------
+1. WHAT IS LANGGRAPH?
+------------------------------------------------------------------------
+LangGraph is a library developed by the LangChain team designed for building stateful, multi-actor applications with LLMs. Unlike standard linear chains (where prompt A leads to prompt B in a strict sequence), LangGraph allows you to define cyclical graphs. 
+
+It is structured around three core concepts:
+1. STATE: A single shared data structure that represents the "memory" of your workflow. Every step in the graph reads from and writes to this state.
+2. NODES: Independent JavaScript functions that perform tasks (e.g., calling an LLM, searching the web, parsing data). Each node receives the current state, performs its operation, and returns updates to the state.
+3. EDGES: The connections that define how the graph transitions from one node to the next.
+
+------------------------------------------------------------------------
+2. THE STATE DEFINITION (lib/agent/state.js)
+------------------------------------------------------------------------
+The agent state is defined using the `Annotation.Root` helper. It stores all the accumulated data as the agent progresses:
+
+* `companyName`: The user-provided target company (e.g. "Apple" or "Tesla").
+* `depth`: "quick" or "deep" search depth.
+* `researchData`: Array of collected search articles and reports. Uses a reducer (x, y) => x.concat(y) to append new data without overwriting.
+* `financialAnalysis`: The analytical text compiled by the Analyst Node.
+* `metrics`: Financial health metrics (P/E ratio, market cap, YoY growth, margins).
+* `decision`: The final verdict ("INVEST" or "PASS").
+* `confidenceScore`: Rationale confidence (0 to 100).
+* `executiveSummary`: Summary thesis text.
+* `swot`: SWOT analysis matrix (lists of strengths, weaknesses, opportunities, threats).
+* `logs`: A collection of real-time process logs displayed in the UI console. Reducer appends new logs.
+
+------------------------------------------------------------------------
+3. THE NODE ARCHITECTURE (lib/agent/graph.js)
+------------------------------------------------------------------------
+The agent is divided into three sequential actors (nodes):
+
+----------------------------------------------------
+NODE A: RESEARCHER (researcherNode)
+----------------------------------------------------
+* Purpose: Gather news and data.
+* Input: Reads the state `companyName` and `depth`.
+* Logic:
+  - If a Tavily Search API key is present: Performs a live Google/Web search querying: "[company] latest news stock performance earnings financial ratios valuation".
+  - If no Tavily Search API key is present: Prompts the LLM (OpenRouter) to generate a detailed historical overview of the company based on its training data.
+* Output: Writes the search results into `state.researchData` and appends status logs.
+
+----------------------------------------------------
+NODE B: FINANCIAL ANALYST (analystNode)
+----------------------------------------------------
+* Purpose: Analyze raw data and extract structured financial health metrics.
+* Input: Reads the accumulated `state.researchData`.
+* Logic:
+  - Formulates a system prompt telling the LLM to act as a financial analyst.
+  - Passes the research data and instructs the LLM to extract a JSON payload containing:
+    1. An analysis text paragraph.
+    2. A structured dictionary of metrics (marketCap, peRatio, revenueGrowth, profitMargin, debtToEquity).
+* Output: Updates `state.financialAnalysis` and `state.metrics`.
+
+----------------------------------------------------
+NODE C: INVESTMENT CRITIC (criticNode)
+----------------------------------------------------
+* Purpose: Conduct SWOT analysis, score the asset, and output a final INVEST or PASS verdict.
+* Input: Reads `state.financialAnalysis` and `state.metrics`.
+* Logic:
+  - Prompts the LLM to act as a conservative investment critic.
+  - Evaluates the Analyst's findings and instructs the LLM to return a JSON object containing:
+    1. "decision": "INVEST" or "PASS"
+    2. "confidenceScore": (integer between 0 and 100)
+    3. "executiveSummary": The thesis rationale
+    4. "swot": Lists of strengths, weaknesses, opportunities, threats
+* Output: Updates `state.decision`, `state.confidenceScore`, `state.executiveSummary`, and `state.swot`.
+
+------------------------------------------------------------------------
+4. COMPILING THE GRAPH
+------------------------------------------------------------------------
+At the bottom of `lib/agent/graph.js`, the nodes and edges are wired together:
+
+```javascript
+const workflow = new StateGraph(AgentStateAnnotation)
+  .addNode('researcher', researcherNode)
+  .addNode('analyst', analystNode)
+  .addNode('critic', criticNode)
+  .addEdge(START, 'researcher')      // Start -> Researcher
+  .addEdge('researcher', 'analyst')  // Researcher -> Analyst
+  .addEdge('analyst', 'critic')      // Analyst -> Critic
+  .addEdge('critic', END);           // Critic -> End
+
+export const agentGraph = workflow.compile();
+```
+
+------------------------------------------------------------------------
+5. BACKEND STREAMING & SERVER-SENT EVENTS (server.js & lib/agent/index.js)
+------------------------------------------------------------------------
+To display real-time updates in the React frontend, the Express server uses Server-Sent Events (SSE):
+
+1. Triggers Research:
+   `POST /api/research` initiates the runner in the background: `runResearchAgent(runId, onUpdate)`.
+2. Graph Execution Stream:
+   Inside `runResearchAgent`, we call:
+   ```javascript
+   const stream = await agentGraph.stream(initialState, { streamMode: 'updates' });
+   ```
+3. Iterating the stream:
+   As the graph executes, it emits chunks. For each chunk (e.g. researcher completed, analyst completed):
+   - We extract the node name and state updates.
+   - We save the updated state to the local JSON database (`lib/db.js`).
+   - We trigger the callback `onUpdate('log', { step: nodeName, run: currentState })`.
+4. SSE Broadcasting:
+   `GET /api/research/:id/stream` registers a client connection. Whenever the background agent emits an update, the server pushes it instantly using standard SSE text formatting:
+   ```text
+   event: log
+   data: {"step":"researcher", "run": {...}}
+   ```
+
+------------------------------------------------------------------------
+6. FRONTEND REAL-TIME UI VISUALIZATION (frontend/src/ResearchDetail.jsx)
+------------------------------------------------------------------------
+The React dashboard listens to the SSE stream using the browser's native `EventSource` API:
+
+* Node Highlights:
+  The UI displays a visual flowchart: `Start` -> `Researcher` -> `Analyst` -> `Critic` -> `Verdict`.
+  By tracking the stream's current step, the active node glows dynamically in the UI.
+* Live Log Terminal:
+  The `logs` array accumulates as nodes complete, printing standard and LLM-generated logs inside a dark terminal-style console.
+* Smooth Transition:
+  Once the "critic" step finishes, the UI triggers custom fade-in animations to present:
+  - The verdict card (INVEST in green with a target icon / PASS in red with a warning icon).
+  - The confidence gauge displaying the score.
+  - The executive thesis text.
+  - The 4-quadrant SWOT matrix.
+
+------------------------------------------------------------------------
+SUMMARY OF FLOW:
+------------------------------------------------------------------------
+[User Query] -> React Dashboard -> POST /api/research -> Express backend ->
+Starts LangGraph Background Runner -> researcherNode (Search/LLM) -> 
+Sends SSE update to frontend -> analystNode (LLM JSON Extraction) -> 
+Sends SSE update to frontend -> criticNode (LLM SWOT/Decision) -> 
+Sends SSE final result -> Graph Ends -> React UI displays final gorgeous thesis.
+========================================================================
